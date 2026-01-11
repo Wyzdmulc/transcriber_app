@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Whisper Transcriber</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h2>Whisper Audio Transcriber</h2>
+
+        <!-- Upload -->
+        <form id="uploadForm" enctype="multipart/form-data">
+            <input type="file" name="audio" accept="audio/*" required>
+            <button type="submit">Transcribe Uploaded File</button>
+        </form>
+
+        <!-- Progress bar -->
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <!-- Success popup -->
+        <div id="successPopup">✅ Transcription complete! File downloaded.</div>
+
+        <hr>
+
+        <!-- Record -->
+        <h3>Record from Microphone</h3>
+        <button id="recordBtn">Start Recording</button>
+        <button id="stopBtn" disabled>Stop Recording</button>
+        <div id="recordingIndicator" class="recording-indicator"></div>
+
+        <form id="recordForm" enctype="multipart/form-data">
+            <input type="file" name="audio" id="audioInput" hidden>
+            <button type="submit">Transcribe Recording</button>
+        </form>
+    </div>
+
+    <script>
+        // Progress bar simulation
+        function simulateProgress() {
+            const progressContainer = document.getElementById("progressContainer");
+            const progressBar = document.getElementById("progressBar");
+            progressContainer.style.display = "block";
+            progressBar.style.width = "0%";
+
+            let progress = 0;
+            const interval = setInterval(() => {
+                if (progress < 90) {
+                    progress += 10;
+                    progressBar.style.width = progress + "%";
+                }
+            }, 500);
+
+            return interval;
+        }
+
+        function completeProgress(interval) {
+            clearInterval(interval);
+            const progressBar = document.getElementById("progressBar");
+            progressBar.style.width = "100%";
+
+            setTimeout(() => {
+                document.getElementById("progressContainer").style.display = "none";
+                progressBar.style.width = "0%";
+            }, 1000);
+        }
+
+        function showSuccessPopup() {
+            const popup = document.getElementById("successPopup");
+            popup.style.display = "block";
+            setTimeout(() => {
+                popup.style.display = "none";
+            }, 3000);
+        }
+
+        // Upload form AJAX
+        document.getElementById("uploadForm").onsubmit = async (e) => {
+            e.preventDefault();
+            const interval = simulateProgress();
+
+            const formData = new FormData(e.target);
+            const response = await fetch("/transcribe", {
+                method: "POST",
+                body: formData
+            });
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "transcription.docx";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
+            completeProgress(interval);
+            showSuccessPopup();
+        };
+
+        // Recording logic
+        let mediaRecorder;
+        let audioChunks = [];
+        const recordBtn = document.getElementById("recordBtn");
+        const stopBtn = document.getElementById("stopBtn");
+        const audioInput = document.getElementById("audioInput");
+        const recordingIndicator = document.getElementById("recordingIndicator");
+
+        recordBtn.onclick = async () => {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.start();
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(audioChunks, { type: "audio/wav" });
+                const file = new File([blob], "recording.wav", { type: "audio/wav" });
+
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                audioInput.files = dataTransfer.files;
+
+                recordingIndicator.style.display = "none";
+            };
+
+            recordingIndicator.style.display = "block";
+            recordBtn.disabled = true;
+            stopBtn.disabled = false;
+        };
+
+        stopBtn.onclick = () => {
+            mediaRecorder.stop();
+            recordBtn.disabled = false;
+            stopBtn.disabled = true;
+        };
+
+        // Record form AJAX
+        document.getElementById("recordForm").onsubmit = async (e) => {
+            e.preventDefault();
+            const interval = simulateProgress();
+
+            const formData = new FormData(e.target);
+            const response = await fetch("/transcribe", {
+                method: "POST",
+                body: formData
+            });
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "transcription.docx";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
+            completeProgress(interval);
+            showSuccessPopup();
+        };
+    </script>
+</body>
+</html>
